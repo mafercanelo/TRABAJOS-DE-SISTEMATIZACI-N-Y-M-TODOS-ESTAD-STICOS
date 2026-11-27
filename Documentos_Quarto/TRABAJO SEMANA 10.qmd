@@ -1,0 +1,501 @@
+---
+title: "Regresión Logistica y Regresión de Poisson"
+author: "Kevin J. Paez"
+format: html
+editor: visual
+---
+
+# Cargar e instalar paquetes
+
+```{r}
+install.packages("broom.helpers")
+install.packages("lmtest")
+install.packages("sandwich")
+install.packages("gtsummary")
+install.packages("broom")
+install.packages("lmtest")
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(rio)
+library(gtsummary)
+library(car)
+library(broom.helpers)
+library(lmtest)
+library(sandwich)
+```
+
+## Cargando los datos
+
+```{r}
+bac_aguda <- import(here("bac_aguda_limpia.csv"))
+```
+
+## Sobre los datos para esta práctica
+
+El dataset de meningitis bacteriana aguda contiene información clínica, demográfica y microbiológica de 581 registros. Incluye variables como edad, sexo, raza, parámetros de sangre y líquido cefalorraquídeo (LCR), resultados de tinción de Gram y cultivos. Asimismo, contiene la variable de presencia o ausencia de meningitis bacteriana aguda, que permitirá realizar análisis de regresión logística.
+
+## Importante, antes de iniciar
+
+La estimación de asociación entre variables para esta sesión es un análisis univariado o no ajustado. En un estudio formal, tesis o artículo científico, que haga empleo de un análisis de regresión logística o regresión de Poisson es necesario procedimientos adicionales, incluyendo la evaluación del ajuste del modelo y el análisis multivariado o ajustado. Lo último, lo veremos en una sesión posterior.
+
+# 1 Regresión logística binaria
+
+La regresión logística binaria es similar a la regresión lineal en el sentido de que modela un desenlace (variable dependiente) en función de uno o más predictores. Sin embargo, la principal diferencia es que en la regresión logística el desenlace debe ser dicotómico: es decir, una variable que solo toma dos posibles valores. La regresión logística nos permite responder preguntas como:
+
+- ¿Cuál es la asociación entre el sexo y la presencia de meningitis bacteriana aguda?
+
+- ¿Existe asociación entre la edad y la presencia de meningitis bacteriana aguda?
+
+Al igual que en la regresión lineal, la regresión logística permite comprobar la hipótesis nula (no hay asociación), estimar la magnitud de la asociación (usando Odds Ratio) y calcular su intervalo de confianza al 95%.
+
+## 1.1 Aspectos básicos para la interpretación la regresión logística
+
+¿Qué son los odds (posibilidades)?
+
+Si 𝑝 es la probabilidad de que ocurra un evento (por ejemplo, muerte), entonces los odds (posibilidades) son el cociente 𝑝/1−𝑝, es decir, la razón entre la probabilidad de que ocurra el evento y la probabilidad de que no ocurra. En medicina, comúnmente se trabaja con el logaritmo natural de los odds, conocido como log-odds o logit. Por ejemplo, si un evento tiene una probabilidad del 75%, sus odds son 0.75/0.25=3, lo que se lee como "3 a 1".
+
+Otro ejemplo: en una reunión de cinco personas (incluyéndote), cada una escribe su nombre para un sorteo. Tu probabilidad de ganar es 1/5 = 0.20, pero los odds de ganar son 1 a 4 (0.25), porque hay un papel con tu nombre y cuatro sin él; una oportunidad de ganar y cuatro de perder.
+
+Entonces, existe una relación directa entre odds y probabilidad, pero expresan lo mismo en diferentes escalas. Los odds son mayores que 1 si, y solo si, la probabilidad es mayor que 0.5; son menores que 1 si la probabilidad es menor que 0.5; y son exactamente 1 cuando la probabilidad es 0.5.
+
+En estudios con modelos de regresión logística para analizar asociaciones, reportamos los odds ratios (OR), que comparan los odds entre grupos.
+
+¿Qué son los Odds Ratio (OR)?
+
+Un *odds ratio* (OR) compara las *odds* (posibilidades) de que ocurra un evento entre dos grupos diferentes. Por ejemplo, supongamos que la probabilidad de enfermedad es 0.35 en hombres y 0.25 en mujeres. Entonces, el OR sería:
+
+$$\frac{0.35}{1 - 0.35} \div \frac{0.25}{1 - 0.25} = \frac{0.35}{0.65} \div \frac{0.25}{0.75} = 0.538 \div 0.333 = 1.62$$
+
+Un OR mayor que 1 (o menor que 1) implica una asociación positiva (o negativa) entre un predictor continuo y el desenlace. Un OR de 1 implica que no hay asociación. Finalmente, como lo mostrado aquí, la medida de OR tiene dirección e intensidad. A esto lo conocemos como una medida de efecto. OR es una de las varias que son usadas para reportar estudios en epidemiología.
+
+## 1.1 El problema en este ejercicio
+
+El desenlace de interés para este ejercicio es la variable muerte (en el dataset, *desenlace*). Evaluaremos la relación entre el estado de mortalidad e hipertensión entre pacientes que fueron diagnosticados con COVID-19 y diabetes mellitus.
+
+## 1.2 Estimando OR usando regresión logística para un predictor categórico
+
+Antes de estimar el OR usando regresión logística, debemos convertir la variable **sexo** a factor (variable categórica en R). Además, establecemos el nivel "Femenino" como referencia, para así estimar el OR comparando pacientes de sexo masculino frente a aquellos de sexo femenino. Hacemos lo mismo con la variable meningitis_bacteriana_aguda, de modo que "Ausente" sea la categoría de referencia y "Presente" sea considerado el evento.
+
+```{r}
+bac_aguda <- bac_aguda |> 
+  mutate(sexo = relevel(factor(sexo), ref = "Femenino"),
+    meningitis_bacteriana_aguda = factor(meningitis_bacteriana_aguda,
+      levels = c("Ausente", "Presente")))
+```
+
+A continuación, usamos la función `glm()`, general linear model, con el argumento `family = binomial` para ajustar una regresión logística y `summary()` para ver los resultados.
+
+```{r}
+regre_log <- glm(
+  meningitis_bacteriana_aguda ~ sexo,
+  family = binomial,
+  data = bac_aguda)
+
+summary(regre_log)
+```
+
+El coeficiente de regresión para sexo masculino (0.2450) representa el logaritmo del OR para presentar meningitis bacteriana aguda, comparando pacientes de sexo masculino con pacientes de sexo femenino.
+
+Para obtener el OR en sí (como usualmente se reporta en los estudios), exponenciamos el coeficiente usando la función `exp()`.
+
+```{r}
+exp(coef(regre_log)[-1]) # [-1] elimina la primera fila, al intercepto.
+```
+
+Usamos la función `confint()` para calcular los intervalos de confianza (IC) al 95 % para los coeficientes de regresión, y exponenciamos estos valores para obtener los IC del 95 % para los OR.
+
+```{r}
+exp(confint(regre_log))[-1, , drop=F]
+```
+
+En este ejemplo, el predictor categórico tenía dos niveles (Femenino y Masculino), por lo que se obtiene el valor p que prueba su asociación con el desenlace (meningitis bacteriana aguda) a partir de la tabla de coeficientes de la regresión (0.213).
+
+## 1.3 Interpretando los resultados
+
+Los pacientes de sexo masculino presentan mayores odds de presentar meningitis bacteriana aguda en comparación con los pacientes de sexo femenino (OR = 1.2777; IC 95 % = 0.8693–1.8810; p = 0.213). Específicamente, presentan aproximadamente 27.77 % más odds de presentar el desenlace. Sin embargo, esta asociación no es estadísticamente significativa, debido a que el intervalo de confianza incluye el valor 1 y el valor p es mayor que 0.05.
+
+## 1.4 Estimando OR usando regresión logística para un predictor numérico
+
+Usando el mismo dataset, la siguiente pregunta que intentaremos responder usando regresión logística es ¿cuál es la asociación entre la mortalidad y la edad en pacientes diagnosticados con COVID-19 y diabetes mellitus?
+
+## 1.5 Ajustamos el modelo
+
+```{r}
+regre_log_1 <- glm(
+  meningitis_bacteriana_aguda ~ edad,
+  family = binomial,
+  data = bac_aguda
+)
+
+summary(regre_log_1)$coef
+```
+
+El coeficiente de regresión para la edad (-0.0048) indica cuánto cambia el logaritmo de los odds del desenlace por cada aumento de un año en la edad. Si convertimos este valor a un OR exponenciándolo mediante la función `exp()`, obtenemos:
+
+```{r}
+exp(coef(regre_log_1)[-1])
+```
+
+El OR obtenido es aproximadamente **0.9952**, lo que indica que por cada año adicional de edad, los odds de presentar meningitis bacteriana aguda disminuyen aproximadamente un 0.48 %.
+
+Finalmente, calculamos un intervalo de confianza del 95 % para el OR usando `confint()` y exponenciando los resultados. El intervalo obtenido fue de **0.9854 a 1.0050**.
+
+```{r}
+exp(confint(regre_log_1)[-1,])
+```
+
+## 1.7 Interpretando el resultado
+
+Los pacientes de mayor edad presentan una ligera disminución en los odds de presentar meningitis bacteriana aguda por cada año adicional (OR = 0.9952; IC 95 % = 0.9854–1.0050; p = 0.3355). Sin embargo, esta asociación no es estadísticamente significativa, debido a que el intervalo de confianza incluye el valor 1 y el valor p es mayor que 0.05. Por lo tanto, no existe evidencia estadística suficiente para afirmar que la edad se asocia con la presencia de meningitis bacteriana aguda.
+
+```{r}
+bac_aguda <- bac_aguda |>
+  mutate(
+    sexo = trimws(as.character(sexo))
+  ) |>
+  filter(sexo %in% c("Femenino", "Masculino")) |>
+  mutate(
+    sexo = factor(
+      sexo,
+      levels = c("Femenino", "Masculino")
+    )
+  )
+```
+
+## 1.8 Cómo reportar los resultados de una regresión logística para un reporte científico.
+
+Aquí utilizamos la función `tbl_uvregression()`, que permite presentar los resultados de la regresión logística en una tabla para un reporte científico. Esta función pertenece al paquete `gtsummary` y permite mostrar los Odds Ratios (OR), los intervalos de confianza al 95 % y los valores p de las variables analizadas.
+
+Como argumentos, especificamos las variables predictoras, el desenlace, el tipo de modelo y otras opciones para personalizar la presentación de los resultados.
+
+```{r}
+theme_gtsummary_language(language = "es")
+```
+
+```{r}
+tabla_reg_logi <- bac_aguda |>
+  tbl_uvregression(
+    include = c(edad, sexo),
+    y = meningitis_bacteriana_aguda,
+    method = glm,
+    method.args = list(family = binomial),
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    hide_n = TRUE,
+    add_estimate_to_reference_rows = FALSE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      edad ~ "Edad (años)",
+      sexo ~ "Sexo"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(
+    estimate = "**OR no ajustado**",
+    p.value = "**Valor p**"
+  )
+
+tabla_reg_logi
+```
+
+Imprime la tabla
+
+```{r}
+tabla_reg_logi
+```
+
+## 2 Regresión de Poisson
+
+La regresión de Poisson es un modelo de regresión utilizado para analizar datos de conteo y tasas. Al igual que la regresión logística, es un tipo de modelo lineal generalizado que se emplea cuando la variable dependiente representa el número de veces que ocurre un determinado evento.
+
+En medicina y ciencias de la salud, la regresión de Poisson permite evaluar la relación entre la frecuencia de ocurrencia de un evento y diferentes factores asociados.
+
+Básicamente, la regresión de Poisson modela la relación entre:
+
+**Desenlace:** variable de conteo, que representa el número de veces que ocurre un evento, por ejemplo, número de infecciones, hospitalizaciones o episodios de una enfermedad.
+
+**Predictores o variables independientes:** pueden ser variables numéricas, como edad, y variables categóricas, como sexo.
+
+Mediante la regresión de Poisson podemos evaluar cómo varía la frecuencia de ocurrencia de un evento según las características de los pacientes.
+
+En la sección anterior utilizamos el Odds Ratio (OR) como medida de asociación para la regresión logística. En la regresión de Poisson, al exponenciar el coeficiente de regresión, obtenemos la razón de tasas (Rate Ratio, RR), que permite comparar la frecuencia esperada de ocurrencia de un evento entre diferentes grupos.
+
+## 2.1 Sobre los datos para esta práctica
+
+El dataset `bac_aguda` contiene información de 581 registros correspondientes a pacientes evaluados para estudiar la presencia de meningitis bacteriana aguda.
+
+El conjunto de datos incluye variables sociodemográficas, clínicas y de laboratorio. Entre ellas se encuentran:
+
+- **Edad:** edad del paciente (numérica).
+
+- **Sexo:** sexo del paciente (categórica).
+
+- **Raza:** característica sociodemográfica (categórica).
+
+- **Leucocitos en sangre:** recuento de leucocitos sanguíneos (numérica).
+
+- **Glucosa en sangre:** concentración de glucosa sanguínea (numérica).
+
+- **Glucosa en LCR:** concentración de glucosa en líquido cefalorraquídeo (numérica).
+
+- **Proteínas en LCR:** concentración de proteínas en líquido cefalorraquídeo (numérica).
+
+- **Leucocitos en LCR:** recuento de leucocitos en líquido cefalorraquídeo (numérica).
+
+- **Tinción de Gram y cultivos:** resultados de pruebas microbiológicas.
+
+- **Meningitis bacteriana aguda:** presencia o ausencia de la enfermedad (binaria).
+
+## 2.2 El problema en este ejercicio
+
+Usando regresión de Poisson modificada evaluaremos la relación entre la presencia de meningitis bacteriana aguda (variable `meningitis_bacteriana_aguda`) y los factores sociodemográficos de los pacientes, como la edad y el sexo.
+
+## 2.3 Ajustamos modelos de regresión de Poisson
+
+Ahora, ajustamos modelos de regresión de Poisson modificada para las 2 variables predictoras usando la función `glm()`. Seguido a esto, utilizamos errores estándar robustos para obtener los resultados y evaluar las razones de prevalencia (RP).
+
+```{r}
+names(bac_aguda)
+
+table(bac_aguda$meningitis_bacteriana_aguda,
+      useNA = "ifany")
+```
+
+```{r}
+bac_aguda$desenlace <- ifelse(
+  bac_aguda$meningitis_bacteriana_aguda == "Presente", 1,
+  ifelse(
+    bac_aguda$meningitis_bacteriana_aguda == "Ausente", 0,
+    NA
+  )
+)
+```
+
+**Para la variable sexo**
+
+```{r}
+reg_poisson1 <- glm(
+  desenlace ~ sexo,
+  data = bac_aguda,
+  family = poisson(link = "log")
+)
+
+summary(reg_poisson1)
+```
+
+Después calculamos los errores estándar robustos:
+
+```{r}
+coeftest(reg_poisson1,
+         vcov. = vcovHC(reg_poisson1, type = "HC0"))
+```
+
+**Para la variable edad**
+
+```{r}
+reg_poisson2 <- glm(
+  desenlace ~ edad,
+  data = bac_aguda,
+  family = "poisson"
+)
+
+summary(reg_poisson2)
+```
+
+Después calculamos los errores estándar robustos:
+
+```{r}
+coeftest(reg_poisson2,
+         vcov. = vcovHC(reg_poisson2, type = "HC0"))
+```
+
+## 2.4 Cómo interpretar y reportar los resultados de una regresión de Poisson
+
+Como en la sección anterior, utilizamos la función `tbl_uvregression()` para generar una tabla con los resultados de los modelos de regresión de Poisson modificada. En este caso, exponenciamos los coeficientes para obtener las razones de prevalencia (RP). Además, incorporamos los errores estándar robustos para calcular los intervalos de confianza al 95 % y los valores p.
+
+```{r}
+tidy_robusto <- function(x, ...) {
+  
+  ct <- lmtest::coeftest(
+    x,
+    vcov. = sandwich::vcovHC(x, type = "HC0")
+  )
+  
+  beta <- ct[, 1]
+  error <- ct[, 2]
+  
+  data.frame(
+    term = rownames(ct),
+    estimate = beta,
+    std.error = error,
+    statistic = ct[, 3],
+    p.value = ct[, 4],
+    conf.low = beta - 1.96 * error,
+    conf.high = beta + 1.96 * error
+  )
+}
+```
+
+```{r}
+tabla_reg_poisson <- bac_aguda |>
+  tbl_uvregression(
+    y = desenlace,
+    include = c(edad, sexo),
+    method = glm,
+    method.args = list(
+      family = poisson(link = "log")
+    ),
+    tidy_fun = tidy_robusto,
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    label = list(
+      edad ~ "Edad (años)",
+      sexo ~ "Sexo"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(
+    estimate = "**RP no ajustada**",
+    ci = "**IC 95%**",
+    p.value = "**Valor p**"
+  ) |>
+  modify_footnote(
+    all_stat_cols() ~ "RP = Razón de prevalencias; IC = Intervalo de confianza."
+  )
+
+tabla_reg_poisson
+```
+
+Imprime la tabla
+
+```{r}
+tabla_reg_poisson
+```
+
+```{r}
+library(dplyr)
+library(sandwich)
+library(lmtest)
+library(gt)
+
+# Preparar la variable sexo
+bac_aguda$sexo <- factor(bac_aguda$sexo)
+
+bac_aguda$sexo <- relevel(
+  bac_aguda$sexo,
+  ref = "Femenino"
+)
+
+# Modelo para edad
+reg_edad <- glm(
+  desenlace ~ edad,
+  data = bac_aguda,
+  family = poisson(link = "log")
+)
+
+# Modelo para sexo
+reg_sexo <- glm(
+  desenlace ~ sexo,
+  data = bac_aguda,
+  family = poisson(link = "log")
+)
+
+# Funcion para calcular RP e IC 95% robustos
+calcular_RP <- function(modelo) {
+  
+  beta <- coef(modelo)
+  
+  matriz <- sandwich::vcovHC(
+    modelo,
+    type = "HC0"
+  )
+  
+  error <- sqrt(diag(matriz))
+  
+  z <- beta / error
+  
+  data.frame(
+    RP = exp(beta),
+    IC_inferior = exp(beta - 1.96 * error),
+    IC_superior = exp(beta + 1.96 * error),
+    p = 2 * pnorm(abs(z), lower.tail = FALSE)
+  )
+}
+
+# Obtener resultados
+resultado_edad <- calcular_RP(reg_edad)
+resultado_sexo <- calcular_RP(reg_sexo)
+
+# Construir tabla
+tabla_final <- data.frame(
+  Caracteristica = c(
+    "Edad (años)",
+    "Sexo",
+    "   Femenino",
+    "   Masculino"
+  ),
+  N = c(
+    nobs(reg_edad),
+    "",
+    "",
+    nobs(reg_sexo)
+  ),
+  RP = c(
+    resultado_edad$RP[2],
+    "",
+    "Referencia",
+    resultado_sexo$RP[2]
+  ),
+  IC_95 = c(
+    paste(
+      round(resultado_edad$IC_inferior[2], 2),
+      round(resultado_edad$IC_superior[2], 2),
+      sep = ", "
+    ),
+    "",
+    "—",
+    paste(
+      round(resultado_sexo$IC_inferior[2], 2),
+      round(resultado_sexo$IC_superior[2], 2),
+      sep = ", "
+    )
+  ),
+  Valor_p = c(
+    round(resultado_edad$p[2], 3),
+    "",
+    "—",
+    round(resultado_sexo$p[2], 3)
+  )
+)
+
+# Presentar tabla
+tabla_final |>
+  gt() |>
+  tab_header(
+    title = "Regresión de Poisson modificada"
+  ) |>
+  cols_label(
+    Caracteristica = "Característica",
+    N = "N",
+    RP = "RP no ajustada",
+    IC_95 = "IC 95%",
+    Valor_p = "Valor p"
+  ) |>
+  tab_source_note(
+    source_note = "RP = Razón de prevalencias; IC = Intervalo de confianza del 95%. Errores estándar robustos HC0."
+  )
+```
+
+### 2.5 Interpretación de los resultados
+
+En el análisis mediante regresión de Poisson modificada con errores estándar robustos, no se encontró una asociación estadísticamente significativa entre la edad y el desenlace (RP = 0.998; IC 95 %: 0.99–1.00; p = 0.374).
+
+Respecto al sexo, los pacientes masculinos presentaron una prevalencia del desenlace 12.5 % mayor en comparación con el sexo femenino (RP = 1.125; IC 95 %: 0.94–1.35; p = 0.211). Sin embargo, esta asociación tampoco fue estadísticamente significativa.
+
+En general, ninguna de las variables analizadas mostró una asociación estadísticamente significativa con el desenlace, considerando un nivel de significancia de 0.05.
