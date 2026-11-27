@@ -1,0 +1,223 @@
+---
+title: "PC2 SEM 4"
+author: "MARIA FE CANELO"
+format: html
+editor: visual
+---
+
+# 1 Paquetes
+
+Al igual que en la sesión anterior, usaremos la función `install.packages()` para instalar el paquete `finalfit` y `flextable` y la función library para cargar los paquetes necesarios. Los paquetes finalfit y flextable serán necesarios para generar tablas descriptivas.
+
+```{r}
+# install.packages("finalfit")
+# install.packages("flextable")
+# install.packages("gtsummary")
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(rio)
+library(gtsummary) ## Para la "Tabla 1"
+library(finalfit) ## Para recodificar
+library(flextable) ## Para exportar tablas
+```
+
+Para mostrar el proceso de inspección y limpieza de datos usaremos un dataset que contiene información de pacientes con diabetes. Abajo, el código para importar el dataset. Recuerda que el dataset `data_bac_aguda_limpia` debe estar en tu folder "data".
+
+```{r}
+data_bac_aguda_limpia = import(here("bac_aguda_limpia.csv"))
+```
+
+# 2 El "paso 0" del análisis descriptivo
+
+Antes de iniciar el análisis descriptivo de los datos, estos deben ser inspeccionados para la eliminación de errores en la codificación o transformación de valores perdidos o anómalos. La transformación de variable (por ejemplo, para obtener una distribución similar a la normal) puede ocurrir en etapas avanzadas del análisis. Además de esto, es importante estar conciente de los tipos de datos presentes, el número de variables y el número de observaciones.
+
+```{r}
+str(data_bac_aguda_limpia)
+```
+
+El dataset `data_bac_aguda_limpia` tiene variables numéricas y categoricas e incluye 24 variables para 581 observaciones.
+
+# 3 Resumen de variables categóricas
+
+Las variables categóricas pueden ser resumidas usando sus distribuciones, es decir al estimar la frecuencia de cada categoría. Aquí podemos usar frecuencias simples y frecuencias porcentuales. Es importante resumir también los datos perdidos. En R, podemos resumir una variable categórica usando la función `table()`. Aquí un ejemplo para la variable variable `sexo`.
+
+```{r}
+table(data_bac_aguda_limpia$sexo, useNA = "ifany")
+```
+
+En la variable sexo se observa una mayor cantidad de pacientes mujeres, con 279 registros, frente a 221 hombres. Además, se identificaron 81 datos faltantes, por lo que estos deben ser considerados al momento de interpretar los resultados.
+
+```{r}
+prop.table(table(data_bac_aguda_limpia$sexo, useNA = "ifany"))
+```
+
+Del total de registros, el 48 % corresponde a mujeres, el 38 % a hombres y el 13,9 % corresponde a datos faltantes. Esto permite observar la distribución de la variable sexo y reconocer la proporción de información que no se encuentra disponible.
+
+Una forma alternativa de calcular la frecuencia simple y relativa es usando la función `count()` de `tidyverse`.
+
+```{r}
+data_bac_aguda_limpia |> 
+  count(sexo, sort = TRUE)
+```
+
+Conocer y mostrar los valores perdidos en un dataset es importante, por ejemplo p**ara decidir si podría ser necesario realizar una imputación de datos o para que los resultados y conclusiones de un estudio sean interpretados con cautela**. El valor `ifany` del argumento `useNA =` **permite que los valores perdidos se muestren.**
+
+# 4 Resumen de variables continuas
+
+## 4.1 Media
+
+Los datos numéricos también tienen una distribución. No obstante, reportar la distribución de cada valor no es adecuado debido a que los valores únicos en una variable numérica son muchos. Una manera efectiva de resumir las variables numéricas es a partir de usar solo uno, dos o unas cuantas medidas resumen. Una de estos es el resumen con medidas de centralidad: media, mediana o moda. En R, usamos la función `mean()` para calcular el valor promedio para una variable numérica. Si hay datos perdidos en la variable (como sucede con `edad`), es importante añadir el valor `TRUE` al argumento `na.rm =`. Esta elimina los valores perdidos del cálculo.
+
+```{r}
+mean(data_bac_aguda_limpia$edad, na.rm = TRUE)
+```
+
+La edad promedio de los pacientes registrados es de **13 años**. Este valor representa la edad media de los participantes con información disponible y permite tener una medida general de la edad de la población estudiada.
+
+## 4.2 La desviación estandard
+
+Otra medida util para describir datos numéricos son las estadísticos de dispersión (medidas de dispersión). La desviación estandard es una de estas y puede ser definido como "*La distancia promedio entre los valores y su promedio*". En R, calculamos la desviación estandard usando la función `sd()`.
+
+```{r}
+sd(data_bac_aguda_limpia$edad, na.rm = TRUE)
+```
+
+La desviación estándar de la edad es de **19 años**. Este resultado permite conocer qué tan dispersas se encuentran las edades de los pacientes con respecto a la edad promedio. Una desviación estándar mayor indica una mayor variabilidad en las edades.
+
+## 4.3 Otras medidas de resumen
+
+Otras medidas útiles para describir datos numéricos incluyen la mediana, el rango intercuartílico y el rango (mínimo y máximo). La mediana es el valor que divide a los datos en la mitad: 50% de los datos se encuentran arriba y 50% debajo de este. En R, las funciones para calcular la mediana es `median()`, `IQR()` para el rango intercuartílico, y `min()` y `max()` para encontrar el valor mínimo y máximo, respectivamente.
+
+```{r}
+median(data_bac_aguda_limpia$edad, na.rm = TRUE)
+```
+
+La mediana de la edad es de **3 años**, lo que significa que el 50 % de los pacientes tiene una edad igual o menor a este valor y el otro 50 % tiene una edad igual o mayor.
+
+```{r}
+min(data_bac_aguda_limpia$edad, na.rm = TRUE)
+```
+
+La edad mínima registrada es de menos de 1 año de edad , correspondiente al paciente de menor edad incluido en la base de datos.
+
+```{r}
+IQR(data_bac_aguda_limpia$edad, na.rm = TRUE)
+```
+
+El rango intercuartílico de la edad es de **19 años**, lo que representa la dispersión del 50 % central de las edades de los pacientes.
+
+## 4.4 ¿Mediana o media? ¿Desviación estandard o rango intercuartílo?
+
+En estadística existe un concepto llamado la "distribución normal", conocida tambien como la distribución Gausiana. En la naturaleza existen variables (como peso o presión sanguínea) que si los mostraramos en un histograma, estos se aproximarían a una distribución normal. La distribución normal puede ser definida con la siguiente formula matemática:
+
+$$\mbox{Pr}(a < x \leq b) = \int_a^b \frac{1}{\sqrt{2\pi}\sigma} e^{-\frac{1}{2}\left( \frac{x-\mu}{\sigma} \right)^2} \, dx$$
+
+De esta formula matemática es importante notar que esta definida por dos parámetros: la media ($\mu$) y desviación estandard ($\sigma$). La importancia de reconocer esto es que a partir de conocer el promedio y desviación estandard de una distribución que se aproxima a la normal, podremos conocer muchas de sus propiedades.
+
+Entonces, la respuesta a la pregunta sobre cuál medida medida descriptiva es conveniente usar, es, dependende de la distribución. Para variables numéricas que son similares a la distribución normal, es conveniente usar la media y la desviación estandard. Para variables numéricas con distribuciones distinta a la normal, podemos usar otras como la mediana o el rango intercuartílico.
+
+Para ilustrar mejor aún esto, veamos la distribución de la variable `edad` e `ano`
+
+```{r}
+par(mfrow=c(1,2)) 
+hist(data_bac_aguda_limpia$edad)
+hist(data_bac_aguda_limpia$ano)
+```
+
+Los histogramas muestran que las variables analizadas no presentan una distribución normal claramente definida. La variable edad presenta una distribución asimétrica hacia la derecha, con una mayor concentración de individuos en edades bajas y una menor frecuencia de edades altas. Por otro lado, la variable año presenta una mayor concentración de observaciones alrededor de los valores superiores, destacando un pico cercano a 78. Por ello, se debe considerar la forma de las distribuciones al momento de seleccionar las medidas estadísticas y las pruebas posteriores.
+
+```{r}
+mean(data_bac_aguda_limpia$edad, na.rm = T)
+```
+
+```{r}
+median(data_bac_aguda_limpia$edad, na.rm = T)
+```
+
+La edad presenta una media y una mediana de 13.6554 años, lo que indica que el valor central de los datos se encuentra aproximadamente en 13.7 años. Aunque ambas medidas coinciden, el histograma muestra una distribución asimétrica hacia la derecha, debido a la presencia de participantes con edades considerablemente mayores.
+
+```{r}
+mean(data_bac_aguda_limpia$ano, na.rm = T)
+```
+
+```{r}
+median(data_bac_aguda_limpia$ano, na.rm = T)
+```
+
+La variable año presenta una media y una mediana de 74.46 aproximadamente. Esto indica que el valor central de las observaciones se encuentra alrededor de 74 años/unidades, según la forma en que esté codificada esta variable. El histograma muestra una mayor concentración de observaciones hacia los valores superiores, especialmente alrededor de 78.
+
+## 4.5 La función `summary()`
+
+`summary()` es una función de R que permite calcular varias medidas estadísticas a la vez. Incluyendo las que ya hemos visto arriba. Abajo, un ejemplo con la variable **numero_caso**
+
+```{r}
+summary(data_bac_aguda_limpia$numero_caso)
+```
+
+La variable número de caso presenta valores desde 1 hasta 581. El 25% de los casos tiene valores inferiores o iguales a 146, mientras que el 50% de las observaciones se encuentra por debajo o igual a 291. Asimismo, el 75% de los casos presenta valores inferiores o iguales a 436. La media y la mediana coinciden en 291, lo que indica que los valores se encuentran centrados alrededor de este punto.
+
+# 5.
+
+Conocer la frecuencia de pacientes con diabetes o la media de glucosa, son ambos informativos. No obstante, en el proceso de análisis será inevitable preguntarnos, por ejemplo como es el promedio de pacientes con diabetes y sin diabetes. O, cómo es la distribución de los niveles de insulina según grupo de edad. En R, podemos calcular esto usando la función `group_by()` y `summarize()`. La función `group_by()` es la primera de varias funciones de `tidyverse` que usaremos frecuentemente. Esta función agrupa las observaciones de acuerdo a una o más variables y este agrupamiento puede ser usado para obtener resultados por por estos subgrupos.
+
+El código abajo agrupa a los participantes según la variable grupo_edad (los grupos de edad: \<50, \<=25, 26-35, 36-50) y en la función `summarize()` se realiza el conteo del número de observaciones y el porcentaje.
+
+```{r}
+data_bac_aguda_limpia |> 
+  group_by(grupo_edad) |> 
+  summarise(n_observ = n(),
+            porcentaje = (n_observ / nrow(data_bac_aguda_limpia)*100))
+```
+
+```{r}
+data_bac_aguda_limpia |>  
+  group_by(raza) |> 
+  summarize(promedio = mean(leucocitos_sangre, na.rm = T))
+```
+
+El promedio de leucocitos en sangre varía ligeramente según la raza. El grupo Blanco presenta el promedio más alto, con aproximadamente **14.01**, seguido del grupo Negro con **13.75**. Los individuos sin raza registrada presentan un promedio de aproximadamente **13.27**. Las diferencias observadas son relativamente pequeñas, por lo que estos resultados describen diferencias en los promedios, pero no permiten afirmar que la raza produzca diferencias estadísticamente significativas sin realizar una prueba estadística.
+
+```{r}
+data_bac_aguda_limpia |>  
+  group_by(raza, sexo) |> 
+  summarize(promedio = mean(leucocitos_sangre, na.rm = T))
+```
+
+se observa que el promedio de leucocitos es generalmente mayor en los hombres que en las mujeres. Entre los participantes de raza Blanca, el promedio fue de **14.14 en hombres** y **13.92 en mujeres**. En el grupo Negro, el promedio fue de **14.69 en hombres** frente a **12.89 en mujeres**. En el grupo sin raza registrada se observa una diferencia mayor, con **15.75 en hombres** y **8.30 en mujeres**. Sin embargo, este último resultado debe interpretarse con precaución, ya que podría estar influido por un número reducido de observaciones.
+
+# 6 select()
+
+La función `select()`, una función más para el manejo de datasets. Especificamente, `select()` extrae variables (columnas) a una nueva tabla.
+
+# 9 La "Tabla 1" con el paquete de `gtsummary`
+
+En la tabla 1 es entonces donde tendremos que mostrar los resúmenes descriptivos que creamos pertinentes. La función `tbl_summary()` del paquete `gtsummary` facilita la construcción de esta tabla.
+
+Se cambia el idioma con el que se presentara la tabla:
+
+```{r}
+theme_gtsummary_language(language = "es") # idioma es = español
+theme_gtsummary_journal(journal = "jama")
+```
+
+4 variables para la "Tabla 1"
+
+```{r}
+data_bac_aguda_limpia |> 
+  select(raza, sexo, conjunto, meningitis_bacteriana_aguda) |> 
+  tbl_summary()
+```
+
+La Tabla 1 presenta la distribución de los pacientes incluidos en la base de datos según raza, sexo, conjunto y presencia de meningitis bacteriana aguda. Las variables categóricas se expresan mediante frecuencias y porcentajes, lo que permite observar la distribución de las características de los pacientes incluidos en el estudio
+
+## 9.1 Exportando la tabla.
+
+Para exportar la tabla que hemos generado, usaremos la función as_flex_table() y save_as_docx del paquete `flextable`. La primera función transforma el objeto (la tabla) a un formato exportable y la segunda la guarda en nuestro directorio.
+
+```{r}
+tabla_1_flex = as_flex_table(tabla_1) # Convertir a flex table
+save_as_docx(tabla_1_flex, path = "tabla_1_flex.docx") # Guardar tabla
+```

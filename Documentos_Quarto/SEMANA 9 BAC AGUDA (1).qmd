@@ -1,0 +1,430 @@
+---
+title: "Regresión Lineal Simple y prueba t de Student"
+author: "Kevin J. Paez"
+format: html
+editor: visual
+---
+
+# Cargar e instalar paquetes
+
+```{r}
+install.packages("car") # Para la prueba de Levene
+```
+
+```{r}
+bac_aguda$sexo[bac_aguda$sexo == "2"] <- "Masculino"
+```
+
+```{r}
+install.packages("broom.helpers")
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(rio)
+library(gtsummary)
+library(car)
+```
+
+# Cargando los datos
+
+```{r}
+bac_aguda <- import(here("bac_aguda.csv"))
+```
+
+# Sobre los datos para esta práctica
+
+La base de datos `bac_aguda_limpia` contiene 581 registros y 24 variables relacionadas con pacientes evaluados por posible meningitis bacteriana aguda. Incluye información demográfica, como edad, sexo y raza, así como datos de laboratorio, entre ellos los niveles de glucosa en sangre, glucosa en líquido cefalorraquídeo (LCR), leucocitos y proteínas en LCR.
+
+# 1 Regresión lineal simple
+
+La regresión lineal simple es un método estadístico que permite evaluar la asociación entre una variable dependiente (desenlace Y) y una variable independiente (predictora X). Este modelo permite analizar si los cambios en una variable se relacionan con cambios en otra.
+
+En esta práctica evaluaremos si existe una asociación entre los niveles de glucosa en sangre (variable independiente X) y los niveles de glucosa en LCR (variable dependiente Y) de los pacientes registrados en nuestra base de datos.
+
+## 1.1 El problema en este ejercicio
+
+El desenlace *Y* de interés para este ejercicio es la variable glucosaen LCR. Veamos la distribución de la variable y el promedio en en un histograma.
+
+```{r}
+bac_aguda |>  
+  ggplot(aes(x = glucosa_lcr)) +
+  geom_histogram(
+    color = "white",
+    ) + 
+  labs(y = "Frecuencia", 
+       x = "Glucosa en LCR") +
+  geom_vline(xintercept = mean(bac_aguda$glucosa_lcr, na.rm = TRUE),
+             color = "darkred", size = 1.5)
+```
+
+En estos datos, el promedio de la glucosa en LCR es:
+
+```{r}
+mean(bac_aguda$glucosa_lcr, na.rm = TRUE)
+```
+
+Una observación importante a partir del histograma y el promedio es que existe variabilidad en los niveles de glucosa en LCR entre los pacientes. El promedio obtenido fue de 58.32. Esto nos permite considerar que otras variables, como la glucosa en sangre, podrían estar relacionadas con esta variación.
+
+## 1.2 Notación en el método de regresión lineal simple
+
+El método de regresión lineal simple encuentra la línea que mejor se ajusta a la descripción lineal entre la glucosa en LCR y la glucosa en sangre, tal como se muestra en la siguiente figura:
+
+```{r}
+plot(glucosa_lcr ~ glucosa_sangre , data = bac_aguda,
+     col = "gray",
+     ylab = "Glucosa en LCR",
+     xlab = "Glucosa en sangre",
+     las = 1,
+     pch = 20, 
+     font.lab = 2, font.axis = 2) 
+
+# La función lm() ajusta el modelo de regresión lineal
+abline(lm(glucosa_lcr ~ glucosa_sangre , data = bac_aguda), lwd = 2, col = "darkred")
+```
+
+El método de regresión lineal simple permite encontrar la línea que mejor representa la relación entre la glucosa en sangre y la glucosa en líquido cefalorraquídeo (LCR). En este caso, buscamos identificar si existe una asociación entre ambas variables, utilizando la glucosa en LCR como variable dependiente (Y) y la glucosa en sangre como variable independiente (X). $$Y = \beta_0 + \beta_1 X + \epsilon$$ Cuando ajustamos un modelo de regresión lineal simple a nuestros datos, estimamos (hallamos) los parámetros del modelo que mejor explican la relación entre las dos variables (desenlace y predictor), incluyendo los coeficientes (β₀, β₁) y el error (𝜀), que representa la variabilidad no explicada por el modelo.
+
+Para un predictor continuo, el intercepto (β₀) es el valor esperado de Y cuando X = 0 (es decir, el promedio del resultado cuando el predictor es cero). La pendiente (β₁) es el cambio promedio en Y por cada unidad de cambio en X. El término de error (𝜀) representa la diferencia entre los valores observados y los valores predichos por el modelo.
+
+Aplicado a nuestro ejemplo, el intercepto (β₀) representa la circunferencia de cintura promedio cuando la glucosa en ayunas es cero (aunque este valor puede no tener sentido práctico, es necesario matemáticamente). La pendiente (β₁) indica cuánto aumenta (o disminuye) en promedio la circunferencia de la cintura por cada unidad adicional de glucosa en ayunas (medida en mg/dL). El error (𝜀) recoge la variación individual que no es explicada solo por la glucosa.
+
+Asi que, como el objetivo es hallar los valores de los parámetros (β₀,β₁,𝜀), es apropiado decir que estamos 'ajustando el modelo de regresión lineal simple' para el problema planteado (a.k.a la asociación entre glucosa y la circunferencia de cintura)
+
+## 1.3 Ajustando el modelo de regresión lineal simple para nuestro problema
+
+En R, usamos la función lm() para ajustar un modelo de regresión lineal. "lm" es la abreviatura para "linear model". Dentro de la función debemos indicarle como argumentos el desenlace X, el predictor Y y la data donde se encuentran las variables. Esta es la estructura para ajustar el modelo con la función lm: lm(y \~ x, data = mis_datos).
+
+Ajustando el modelo para nuestros datos
+
+```{r}
+modelo_ejemplo = lm(glucosa_lcr ~ glucosa_sangre, data = bac_aguda)
+```
+
+Para ver los resultados, usamos la función summary() y dentro, el objeto modelo_ejemplo.
+
+```{r}
+summary(modelo_ejemplo)
+```
+
+## 1.4 Interpretando los resultados
+
+La sección Coefficients del resultado:
+
+```{r}
+summary(modelo_ejemplo)$coef
+```
+
+...muestra las estimaciones y las pruebas de hipótesis para el intercepto (β₀), etiquetado como (Intercept), y para el coeficiente de la circunferencia de cintura (la pendiente, β₁), etiquetado como Circunfe_brazo_cm.
+
+En esta misma sección, la columna Estimate muestra los coeficientes estimados del modelo de regresión lineal simple. Así, el modelo que mejor se ajusta tiene un intercepto de 59.474 y una pendiente de 0.49970.
+
+La tabla de coeficientes también muestra el error estándar de cada estimación, su valor t y su valor p (etiquetado como Pr(\>\|t\|)). El valor p del intercepto usualmente no es de interés, pero el valor p del predictor (Circunfe_brazo_cm) prueba la hipótesis nula de que el desenlace NO tiene asociación con el predictor o, dicho de otra manera, que la pendiente es cero. La hipótesis nula plantea que la línea de mejor ajuste es una línea horizontal, lo que indicaría que el promedio esperado del desenlace es el mismo en todos los valores del predictor; es decir, que no existe asociación entre el desenlace (glucosa) y el predictor (circunferencia de cintura).
+
+Finalmente, el valor R-cuadrado es una medida de bondad de ajuste que varía entre 0 (sin asociación) y 1 (asociación lineal perfecta), y corresponde al cuadrado de la correlación de Pearson entre el desenlace y el predictor. Se interpreta como la proporción de la variación en el desenlace que es explicada por el modelo. En nuestro modelo, el R² (R-cuadrado) es 0.0871. Esto significa que aproximadamente el 8.6% de la variación en los valores de glucosa en ayunas se explica por la circunferencia de la cintura
+
+## 1.5 ¿Cómo reportar los resultados del ajuste del modelo de regresión lineal simple?
+
+Tanto si se trata de una tesis o un artículo, abajo un ejemplo de cómo reportar los resultados del presente problema:
+
+> "(...) empleamos un modelo de regresión linear para evaluar la asociación entre el nivel de glucosa en ayunas (mg/dL) y la circunferencia de cintura (cm) usando datos de 965 adultos. 8.71% de la variación en el nivel de glucosa en ayunas fue explicada por la circunferencia de cintura (R²=0.0871). Se encontró una asociación positiva significativa entre la glucosa en ayunas y la circunferencia de cintura (B=0.499; p \<.001). En promedio, por cada diferencia de 1 cm en la circunferencia de cintura, los adultos difieren en el promedio de glucosa en ayunas en 0.499 mg/dL"
+
+Adicionalmente, es buena idea presentar los resultados en un tabla.
+
+```{r}
+theme_gtsummary_language("es")
+
+tabla_reporte <- modelo_ejemplo |> 
+  tbl_regression(intercept = T,
+                 estimate_fun = function(x) style_sigfig(x, digits = 4),
+                 pvalue_fun   = function(x) style_pvalue(x, digits = 3),
+                 label        = list(glucosa_sangre ~ "Glucosa en sangre")) |>
+  modify_caption("Regresión de la glucosa en LCR en función de la glucosa en sangre")
+
+tabla_reporte
+```
+
+**Exportamos la tabla**
+
+```{r}
+tabla_reporte |> 
+  as_flex_table()  |> 
+  flextable::save_as_docx(path = "tabla_reporte.docx")
+```
+
+# 2 Prueba t de Student para muestras independientes
+
+Imagina que, ahora, luego de haber tomado las mediciones de medidas de glucosa en ayunas (mg/dL) queremos saber si el promedio de glucosa en varones es significativamente diferente del promedio de glucosa en mujeres. Es esta situación, hay dos grupos (varones y mujeres) de muestras independientes.
+
+## 2.1 ¿Cuándo usar la prueba t de Student para muestras independientes?
+
+- Cuando los dos grupos de muestras a comparar han sido muestreadas de una distribución normal. Aquí podemos usar la prueba de Shapiro-Wilk.
+
+- Cuando las varianzas de los dos grupos son iguales. Esto puede ser evaluado con la prueba F.
+
+Usualmente, la hipótesis de la prueba t de Student son:
+
+- Hipótesis nula (H₀): No hay diferencia entre las medias de los dos grupos. $$H_0: \mu_1 = \mu_2$$
+- Hipótesis alternativa (H₁): Hay una diferencia entre las medias de los dos grupos. $$H_1: \mu_1 \neq \mu_2$$
+
+## 2.2 Sobre los datos para esta práctica
+
+El dataset circun_glucosa, de 1000 personas adultas (\>=20 años de edad), contiene datos circunferencia de cintura (en centímetros), la variable sexo y otros datos demográficos.2.3 Resumen y visualización
+
+Resumen
+
+Antes de realizar la prueba t de Student es importante conocer la distribución de los datos e identificar si hay valores perdidos o atípicos. Empecemos por el resumen:\
+\
+
+```{r}
+bac_aguda$sexo[bac_aguda$sexo == "2"] <- "Masculino"
+```
+
+```{r}
+bac_aguda |>
+  filter(!is.na(sexo), trimws(sexo) != "") |>
+  group_by(sexo) |>
+  summarise(
+    count = n(),
+    mean = mean(glucosa_lcr, na.rm = TRUE),
+    sd = sd(glucosa_lcr, na.rm = TRUE)
+  )
+```
+
+**Interpretación:**
+
+El resumen estadístico muestra que se analizaron 451 pacientes con datos disponibles de sexo y glucosa en líquido cefalorraquídeo (LCR), de los cuales 249 fueron mujeres y 202 hombres. Para realizar esta comparación, se excluyó un registro que no tenía el sexo registrado, con la finalidad de trabajar únicamente con los grupos femenino y masculino.
+
+El promedio de glucosa en LCR fue de 59.91 en mujeres y 56.48 en hombres. Asimismo, las desviaciones estándar fueron de 33.16 y 35.09, respectivamente. Estos resultados muestran que los niveles de glucosa presentan variabilidad en ambos grupos, siendo ligeramente mayor la dispersión en los hombres.
+
+En general, se observa que las mujeres presentan un promedio de glucosa en LCR ligeramente superior al de los hombres; sin embargo, será necesario realizar la prueba t de Student para determinar si esta diferencia es estadísticamente significativa.\
+\
+Visualización
+
+```{r}
+bac_aguda |>
+  filter(!is.na(sexo), trimws(sexo) != "",
+         !is.na(glucosa_lcr)) |>
+  ggplot(aes(y = glucosa_lcr, x = sexo)) +
+  geom_boxplot() +
+  labs(y = "Glucosa en LCR", x = "Sexo")
+```
+
+## 2.4 Pruebas preliminares para evaluar los supuestos de la prueba t de Student
+
+Supuesto 1: los datos deben haber sido muestreados de una distribución normal.
+
+Para esto, usamos la prueba de Shapiro-wilk.
+
+```{r}
+bac_aguda |> 
+  filter(sexo == "Masculino", !is.na(glucosa_lcr)) |> 
+  summarise(shapiro = list(shapiro.test(glucosa_lcr))) |> 
+  pull(shapiro)
+```
+
+```{r}
+bac_aguda |> 
+  filter(sexo == "Femenino", !is.na(glucosa_lcr)) |> 
+  summarise(shapiro = list(shapiro.test(glucosa_lcr))) |> 
+  pull(shapiro)
+```
+
+Los resultados de la prueba de Shapiro-Wilk muestran que ambos grupos presentan valores p menores a 0.05. Por lo tanto, se rechaza la hipótesis de normalidad, indicando que los niveles de glucosa en LCR no siguen una distribución normal en ninguno de los dos grupos.\
+\
+Supuesto 2: Las varianzas de los dos grupos son iguales Para esto podemos usar la prueba F para evaluar la homogeneidad de varianzas. Esto esta implementado en la función var.test()
+
+```{r}
+bac_aguda |>
+  filter(!is.na(sexo), trimws(sexo) != "",
+         !is.na(glucosa_lcr)) |>
+  var.test(glucosa_lcr ~ sexo, data = _)
+```
+
+El resultado de la prueba F presenta un valor p de 0.3967, el cual es mayor al nivel de significancia de 0.05. Por lo tanto, no se rechaza la hipótesis nula de igualdad de varianzas. Esto indica que no se encontraron diferencias estadísticamente significativas entre las varianzas de los niveles de glucosa en LCR de los pacientes femeninos y masculinos. En consecuencia, se considera que existe homogeneidad de varianzas entre ambos grupos.
+
+## 2.5 Realizamos la prueba t para nuestros datos.
+
+```{r}
+bac_aguda |>
+  filter(!is.na(sexo), trimws(sexo) != "",
+         !is.na(glucosa_lcr)) |>
+  t.test(glucosa_lcr ~ sexo,
+         data = _,
+         var.equal = TRUE)
+```
+
+**Interpretando los resultados**
+
+**Interpretando los resultados**
+
+El valor p de la prueba t de Student es 0.2866, el cual es mayor que el nivel de significancia α = 0.05. Por lo tanto, no se rechaza la hipótesis nula. Esto indica que no existe una diferencia estadísticamente significativa entre los niveles promedio de glucosa en LCR de los pacientes femeninos y masculinos.
+
+Aunque el promedio de glucosa fue ligeramente mayor en las mujeres (59.91) en comparación con los hombres (56.48), esta diferencia no es estadísticamente significativa. Por lo tanto, no se puede afirmar que el sexo esté relacionado con una diferencia en los niveles promedio de glucosa en LCR.
+
+# 3 Análisis de Varianza (ANOVA)
+
+El análisis de varianza (ANOVA), especificamente el ANOVA de una vía, es una extensión de la prueba t para muestras independientes cuando se comparan medias entre más de dos grupos. En el ANOVA de una vía, los datos se organizan en varios grupos basados en una única variable de agrupación (también llamada variable de factor). En este ejecicio, evaluamos si el peso corporal (kg) es significativamente distinto segun estado de tabaquismo.
+
+## 3.1 ¿Cuándo usar el ANOVA de una vía?
+
+- Las observaciones se obtienen de forma independiente y aleatoria de la población definida por los niveles del factor.
+
+- Los datos de cada nivel del factor se distribuyen normalmente.
+
+- Hipótesis nula (H₀): No hay diferencia entre las medias de los dos grupos.
+
+- Estas poblaciones normales tienen una varianza común. (Se puede usar la prueba de Levene para verificar esto.)
+
+## 3.2 Sobre los datos para esta práctica
+
+La base de datos `bac_aguda_limpia` contiene 581 registros y 24 variables relacionadas con pacientes evaluados por posible meningitis bacteriana aguda. Para esta práctica se utilizarán los niveles de glucosa en líquido cefalorraquídeo (LCR) como variable cuantitativa y el mes como variable de agrupación, con la finalidad de comparar los promedios de glucosa entre los diferentes meses del año.
+
+## 3.3 Resumen y visualización
+
+Resumen
+
+Primero, vamos a preparar los datos. Esto es necesario porque tenemos registros sin mes y sin glucosa en LCR.\
+\
+
+```{r}
+datos_anova <- bac_aguda |>
+  filter(!is.na(mes), trimws(mes) != "",
+         !is.na(glucosa_lcr)) |>
+  mutate(raza = factor(raza,
+                      levels = c("Negro","Blanco")
+  ))
+```
+
+```{r}
+group_by(datos_anova, raza) |>
+  summarise(
+    count = n(),
+    mean = mean(glucosa_lcr, na.rm = TRUE),
+    sd = sd(glucosa_lcr, na.rm = TRUE),
+    min = min(glucosa_lcr, na.rm = TRUE),
+    max = max(glucosa_lcr, na.rm = TRUE)
+  )
+```
+
+El resumen estadístico muestra la distribución de los niveles de glucosa en LCR según los meses del año. Se analizaron 450 registros que contaban con información disponible para ambas variables. Se observa que agosto presentó el promedio más alto de glucosa en LCR, con 70.20, mientras que febrero presentó el promedio más bajo, con 38.57. Asimismo, se evidencia variabilidad en los valores de glucosa entre los diferentes meses, lo que permite plantear una comparación de sus promedios mediante el análisis de varianza (ANOVA).\
+\
+Visualización\
+Ahora realizamos el gráfico de cajas, igual que en el ejemplo de la profesora.
+
+```{r}
+datos_anova |>
+  ggplot(aes(y = glucosa_lcr, x = raza)) +
+  geom_boxplot() +
+  labs(
+    y = "Glucosa en LCR",
+    x = "raza"
+  )
+```
+
+En el gráfico de cajas se observa la distribución de los niveles de glucosa en LCR según los grupos de raza, identificándose las siguientes características:
+
+- **Grupo Negro:** presenta la mediana más elevada (64 aproximadamente), mayor dispersión de los datos y cinco valores atípicos, que alcanzan aproximadamente 240.
+
+- **Grupo Blanco:** presenta una mediana aproximada de 58, una dispersión moderada y un valor atípico cercano a 167.
+
+- **Grupo NA**: muestra una mediana aproximada de 56, menor dispersión y ausencia de valores atípicos.
+
+Conclusión: El grupo Negro presenta niveles centrales de glucosa en LCR ligeramente superiores y mayor variabilidad en comparación con los demás grupos. Sin embargo, es necesario realizar la prueba ANOVA para determinar si las diferencias observadas son estadísticamente significativas.
+
+## 3.4 Pruebas preliminares para evaluar los supuestos del ANOVA
+
+```{r}
+bac_aguda <- bac_aguda |>
+  mutate(raza = as.factor(raza))
+```
+
+Se aplicó la prueba de Shapiro-Wilk para evaluar si los niveles de glucosa en LCR presentan una distribución normal en los diferentes grupos de raza.
+
+**NEGRO**
+
+```{r}
+bac_aguda |>
+  filter(raza == "Negro", !is.na(glucosa_lcr)) |>
+  summarise(shapiro = list(shapiro.test(glucosa_lcr))) |>
+  pull(shapiro)
+```
+
+- **Raza negro:** se obtuvo un estadístico W = 0.93191 y un valor p = 1.685 × 10⁻⁹. Como el valor p es menor que 0.05, se rechaza la hipótesis de normalidad
+
+**BLANCO**
+
+```{r}
+bac_aguda |>
+  filter(raza == "Blanco", !is.na(glucosa_lcr)) |>
+  summarise(shapiro = list(shapiro.test(glucosa_lcr))) |>
+  pull(shapiro)
+```
+
+- **Raza Blanca:** se obtuvo un estadístico W = 0.97343 y un valor p = 0.001114. Debido a que el valor p también es menor que 0.05, se rechaza la hipótesis de normalidad.
+
+```{r}
+datos_anova <- bac_aguda[
+  !is.na(bac_aguda$raza) & !is.na(bac_aguda$glucosa_lcr),
+]
+
+car::leveneTest(glucosa_lcr ~ raza, data = datos_anova)
+```
+
+Se aplicó la prueba de Levene para evaluar la homogeneidad de varianzas de los niveles de glucosa en LCR según los grupos de raza.
+
+Los resultados obtenidos fueron:
+
+- Estadístico F: 2.3445.
+
+- Valor p: 0.1264.
+
+- Nivel de significancia (α): 0.05.
+
+Conclusión: Como el valor p (0.1264) es mayor que 0.05, no se rechaza la hipótesis nula de igualdad de varianzas. Por lo tanto, no existen diferencias estadísticamente significativas entre las varianzas de los grupos Negro y Blanco, considerándose que se cumple el supuesto de homogeneidad de varianzas para el ANOVA. el ANOVA.
+
+## 3.5 Realizamos la prueba de ANOVA de una vía para nuestros datos.
+
+```{r}
+res_anova <- aov(glucosa_lcr ~ raza, data = datos_anova)
+```
+
+```{r}
+summary(res_anova)
+```
+
+- Se realizó la prueba ANOVA de una vía para comparar los niveles de glucosa en LCR según los grupos de raza (Negro y Blanco).
+
+  Resultados obtenidos:
+
+  - Grados de libertad (Df): 1 para raza y 445 para los residuos.
+
+  - Suma de cuadrados (Sum Sq): 3779 entre grupos y 515663 dentro de los grupos.
+
+  - Media cuadrática (Mean Sq): 3779 entre grupos y 1159 dentro de los grupos.
+
+  - Estadístico F: 3.261.
+
+  - Valor p: 0.0716.
+
+  Hipótesis estadísticas:
+
+  - H₀: Los niveles promedio de glucosa en LCR son iguales entre los grupos de raza.
+
+  - H₁: Los niveles promedio de glucosa en LCR son diferentes entre los grupos de raza.
+
+  Conclusión:
+
+  Como el valor p (0.0716) es mayor que el nivel de significancia (α = 0.05), no se rechaza la hipótesis nula. Por lo tanto, no se encontraron diferencias estadísticamente significativas en los niveles promedio de glucosa en LCR entre los grupos Negro y Blanco. Aunque existen diferencias en los valores observados, estas no son suficientes para afirmar que los promedios sean diferentes estadísticamente.**\
+  Interpretando los resultados**
+
+Aunque para este ejecicio no hemos encontrado una diferencia estadísticamente significativa, cuando sí lo hay, es importante realizar una prueba de comparación por pares para saber dónde se encuentra la diferencia. Para esto, se puede utilizar la prueba Tukey HSD (Tukey Honest Significant Differences)
+
+```{r}
+TukeyHSD(res_anova)
+```
+
+Como el valor p ajustado (0.0716) es mayor que el nivel de significancia (0.05), no se encontraron diferencias estadísticamente significativas entre los grupos Negro y Blanco. Asimismo, el intervalo de confianza incluye el valor cero, lo que confirma que la diferencia observada no es estadísticamente significativa.
+
+Por lo tanto, los resultados de Tukey coinciden con los obtenidos en la prueba ANOVA: no existe evidencia estadística suficiente para afirmar que los niveles promedio de glucosa en LCR sean diferentes entre ambos grupos de raza.

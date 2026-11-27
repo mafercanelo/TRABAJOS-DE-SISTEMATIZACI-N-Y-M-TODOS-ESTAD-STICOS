@@ -1,0 +1,109 @@
+---
+title: "Poder estadístico y cálculo de muestra"
+format: html
+---
+
+# Instalar y Cargar paquetes para el cálculo de análisis de poder estadístico
+
+```{r}
+install.packages("epiR")
+```
+
+```{r}
+library(epiR)
+```
+
+**Para calcular tamaño de muestra, hacer analisis epidemiologicos y bioestadisticos**
+
+# 1. Cálculo de muestra para un estudio de prevalencia (survey)
+
+Para el cálculo de muestra de un estudio de prevalencia es necesaria la información sobre la prevalencia esperada (`Py`) y, opcionalmente, el tamaño de la población.
+
+**Caso 1: Un grupo de investigadores desea analizar la epidemiología de la meningitis bacteriana y su evolución a lo largo del tiempo. Para ello, se tomó como referencia un estudio publicado en *The Lancet Regional Health – Americas*, que identificó 5.032 casos de meningitis bacteriana y evaluó su incidencia en cuatro periodos epidemiológicos: 2008–2009, 2010–2019, 2020–2021 y 2022–2023.**
+
+**Entre los resultados, se identificó que *Streptococcus pneumoniae* fue el principal agente causal, representando el 59 % de los casos. Asimismo, la incidencia disminuyó durante el periodo 2020–2021 y aumentó nuevamente durante 2022–2023.**
+
+\
+(DOI: [10.1016/j.lana.2025.101120 ](https://doi.org/10.1016/j.lana.2025.101120) )
+
+**¿Cuál sería el tamaño de muestra necesario para estimar la proporción de casos de meningitis bacteriana causados por *Streptococcus pneumoniae?***
+
+Aquí, usamos la función `episssimpleestb()`: Sample size to estimate a binary outcome using simple random sampling
+
+```{r}
+epi.sssimpleestb(N = NA, Py = 0.59, 
+                 epsilon = 0.20, error = "relative", 
+                 se = 1, sp = 1, 
+                 nfractional = FALSE, conf.level = 0.95)
+```
+
+Es necesario 67 participantes.
+
+# 2. Cálculo de muestra para un estudio de casos y controles
+
+Un grupo de investigadores desea identificar los factores asociados con la mortalidad por meningitis bacteriana aguda en pacientes pediátricos hospitalizados. Para ello, se tomará como referencia el estudio *“Determinants of mortality among pediatric patients admitted to Wolaita Sodo University Comprehensive Specialized Hospital with acute bacterial meningitis”*, publicado en 2023. **En la investigación original se incluyeron 355 pacientes: 71 casos (niños que fallecieron por meningitis bacteriana aguda) y 284 controles (niños que sobrevivieron hasta el alta hospitalaria).**
+
+En un estudio de casos y controles realizado en pacientes pediátricos hospitalizados con meningitis bacteriana aguda, se evaluó la asociación entre el tamaño familiar y la mortalidad. Según los resultados de la tabla 5 del estudio, **entre los controles (pacientes sobrevivientes), 112 (39,4 %)** pertenecían a familias de seis o más integrantes, mientras que 172 (60,7 %) pertenecían a familias de cinco o menos integrantes. Entre los casos (pacientes fallecidos), 49 (69 %) pertenecían a familias de seis o más integrantes y 22 (31 %) a familias de cinco o menos integrantes. La asociación presentó un **OR crudo de 3,42** (IC del 95 %: 1,96–5,97).
+
+|     |
+|:----|
+|     |
+
+[https://pmc.ncbi.nlm.nih.gov/articles/PMC10694971/?utm](https://pmc.ncbi.nlm.nih.gov/articles/PMC10694971/?utm_source=chatgpt.com#CR10)
+
+**¿Cuál sería el tamaño de muestra necesario para un estudio de casos y controles no pareados que permita evaluar la asociación entre pertenecer a una familia de seis o más integrantes y la mortalidad por meningitis bacteriana aguda en pacientes pediátricos hospitalizados?**
+
+Aquí, usamos la función `epi.sscc()`: Sample size, power or minimum detectable odds ratio for an unmatched or matched case-control study
+
+```{r}
+epi.sscc(OR =3,42, p1 = NA, 
+         p0 = 0.394, n = NA, 
+         power = 0.80, r = 1, 
+         phi.coef = 0, design = 1, 
+         sided.test = 2, conf.level = 0.95, 
+         method = "unmatched", nfractional = FALSE, 
+         fleiss = FALSE)
+```
+
+se necesitan 32 participantes en total
+
+El estudio tiene una potencia estadística del 80 % para detectar la asociación especificada, si se cumplen los supuestos del cálculo.
+
+**Es necesario 16 casos (fallecieron) y 16 controles (sobrevivieron).**
+
+# 3. Cálculo de muestra para un estudio de cohorte
+
+Caso 3. Un grupo de investigadores desea Se desea determinar el tamaño de muestra necesario para comparar la proporción de mortalidad intrahospitalaria en pacientes adultos con meningitis bacteriana entre dos periodos. Según el estudio de Pomar et al. (2023), la **proporción de mortalidad fue de 10,4 % (25/241)** **durante el periodo 1982–2000** y de **9,2 % (8/87) durante el periodo 2001–2019.** Se considerará un nivel de confianza del 95 %, una potencia estadística del 80 % .\
+[https://pmc.ncbi.nlm.nih.gov/articles/PMC10253325/?utm](https://pmc.ncbi.nlm.nih.gov/articles/PMC10253325/?utm_source=chatgpt.com)
+
+**¿Cuál sería el tamaño de muestra necesario para comparar la mortalidad intrahospitalaria entre pacientes adultos con meningitis bacteriana de los periodos 1982–2000 y 2001–2019?**
+
+Para responder, utilizamos la función `epi.sscohortt()`: *Sample size, power or minimum detectable incidence rate ratio for a cohort study using person or animal time data*.
+
+```{r}
+epi.sscohortt(irexp1 = 25/241, irexp0 = 8/87, FT = 4, n = NA, 
+              power = 0.80, r = 1, design = 1, sided.test = 2, 
+              nfractional = FALSE, conf.level = 0.95)
+```
+
+Es necesario 6280 de expuestos y 6280 no expuestos.\
+\
+Se esta estimando cuántos pacientes serian necesarios estudiar para comparar ambas proporciones con suficiente precisión estadística.
+
+# 4. Cálculo de poder estadístico
+
+**Caso 4.** Un grupo de investigadores desea comparar la mortalidad intrahospitalaria en pacientes adultos con meningitis bacteriana entre dos periodos. Para ello, se propone incluir a 150 pacientes del periodo 1982–2000 y a 150 pacientes del periodo 2001–2019. Según el estudio de Pomar et al. (2023), en el primer periodo fallecieron 25 de 241 pacientes y, en el segundo, fallecieron 8 de 87 pacientes.
+
+[https://pmc.ncbi.nlm.nih.gov/articles/PMC10253325/?utm](https://pmc.ncbi.nlm.nih.gov/articles/PMC10253325/?utm_source=chatgpt.com)
+
+**Pregunta:** **¿Cuál es el poder estadístico con el tamaño de muestra propuesto para cada grupo?**\
+
+Para responder, utilizamos la función `epi.sscohortt()`: *Sample size, power or minimum detectable incidence rate ratio for a cohort study using person or animal time data*.
+
+```{r}
+epi.sscohortt(irexp1 = 25/241, irexp0 = 8/87, FT = 4, n = 300, 
+              power = NA, r = 1, design = 1, sided.test = 2, 
+              nfractional = FALSE, conf.level = 0.95)
+```
+
+Tendremos un poder estadístico de 63.4% para rechazar correctamente la hipótesis nula.

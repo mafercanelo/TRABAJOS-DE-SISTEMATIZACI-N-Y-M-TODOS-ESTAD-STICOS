@@ -1,0 +1,158 @@
+---
+title: "Bondad de ajuste"
+format: html
+editor: CANELO PEREZ MARIA FE
+  markdown: 
+    wrap: 72
+---
+
+### Glosario introductorio
+
+**1. Modelo estadístico**\
+Es una representación matemática que describe relaciones entre variables. Se utiliza para hacer inferencias, predicciones o entender el comportamiento de los datos.
+
+**2. Variable continua**\
+Tipo de variable numérica que puede tomar un número infinito de valores dentro de un rango (por ejemplo, niveles de glucosa o circunferencia de cintura).
+
+**3. Distribución de probabilidad**\
+Describe cómo se distribuyen los valores posibles de una variable aleatoria. Algunas distribuciones comunes incluyen la normal, binomial y chi-cuadrado.
+
+**4. Hipótesis nula (H₀)**\
+Proposición que se plantea al inicio de una prueba estadística y que indica la ausencia de efecto o diferencia. Se rechaza o no según el valor p obtenido.
+
+**5. Valor p**\
+Probabilidad de obtener un resultado igual o más extremo que el observado, si la hipótesis nula fuera cierta. Un valor p menor a 0.05 suele considerarse estadísticamente significativo.
+
+# ¿Que son las pruebas de bondad de ajuste?
+
+Las pruebas de bondad de ajust**e** evalúan qué tan bien los datos observados se ajustan a los valores esperados según un modelo estadístico.
+
+La bondad de ajuste puede evaluarse en al menos dos escenarios principales:
+
+### 1. En modelos de regresión
+
+Por ejemplo, un estudiante podría aplicar un modelo de regresión lineal para evaluar la relación entre el peso de los pacientes de un hospital y su nivel de glucosa. Para determinar si el modelo es adecuado para explicar esta relación, se puede calcular el estadístico de bondad de ajuste R².
+
+El estadístico R² mide el porcentaje de variabilidad de la variable dependiente (en este caso, el nivel de glucosa) que es explicado por el modelo de regresión. Cuanto mayor sea el valor de R², mejor será el ajuste del modelo a los datos observados.
+
+### 2. En distribuciones de probabilidad
+
+En algunos casos, el modelo estadístico que se desea aplicar requiere que los datos sigan una distribución de probabilidad específica, como la distribución normal.
+
+Por otro lado, muchas pruebas de hipótesis utilizan **estadísticos de prueba** (no necesariamente modelos completos). Por ejemplo:
+
+- Las **pruebas t** (t de Student) usan el estadístico *t*.
+
+- El **ANOVA** usa el estadístico *F*.
+
+- Las **pruebas de chi-cuadrado** usan el estadístico χ².
+
+Estas pruebas se basan en las distribuciones teóricas de estos estadísticos para calcular los valores p, los cuales permiten decidir si aceptar o rechazar la hipótesis nula.
+
+Este esta sesión práctica se enfocará en el segundo escenario.
+
+# Cargamos los paquetes necesarios
+
+```{r}
+library(rio)
+library(here)
+```
+
+# Cargar los datos
+
+```{r}
+data_bac_aguda_limpia <- import("bac_aguda_limpia.csv")
+```
+
+# 1. Para datos continuos
+
+La prueba t de Student y el ANOVA son pruebas estadísticas que permiten evaluar si el promedio de una variable numérica presenta diferencias entre dos o más grupos.
+
+Ambas pruebas requieren que se cumplan determinados supuestos, entre ellos la normalidad de los datos. Para comprobar esta condición se utiliza la prueba de Shapiro-Wilk, que permite determinar si una variable numérica sigue una distribución normal.
+
+\*\*En nuestra base de datos sobre meningitis bacteriana aguda, evaluaremos la normalidad de las variables edad y leucocitos en líquido cefalorraquídeo (LCR).\*\*
+
+**DATO:** El código utiliza la función `shapiro.test()` para aplicar la prueba de normalidad de Shapiro-Wilk a la variable edad y leucocitos en líquido cefalorraquídeo (LCR). Dentro de esta función se utiliza `na.omit()`, que permite excluir temporalmente los valores faltantes (NA) de la variable, evitando errores durante el análisis estadístico. De esta manera, la prueba se realiza únicamente con los datos disponibles y permite determinar si los valores registrados siguen una distribución normal.
+
+**Para la variable edad**
+
+Esta variable representa la edad de los pacientes registrados en la base de datos, expresada en años. Se utilizará la prueba de Shapiro-Wilk para determinar si sus valores presentan una distribución normal.
+
+```{r}
+shapiro.test(na.omit(data_bac_aguda_limpia$edad))
+```
+
+El resultado de la prueba de Shapiro-Wilk muestra un valor p menor a 0.05. Por lo tanto, se rechaza la hipótesis nula de normalidad y se concluye que la variable edad no presenta una distribución normal en los pacientes registrados en nuestra base de datos.\
+\
+\*\*Para la variable leucocitos en LCR\
+\*\* Esta variable representa la cantidad de leucocitos presentes en el líquido cefalorraquídeo (LCR) de los pacientes. Su evaluación permite determinar si los valores registrados siguen una distribución normal.
+
+```{r}
+shapiro.test(na.omit(data_bac_aguda_limpia$leucocitos_lcr))
+```
+
+El resultado de la prueba de Shapiro-Wilk presenta un valor p menor a 0.05. Por lo tanto, se rechaza la hipótesis nula y se concluye que la variable leucocitos en LCR no sigue una distribución normal.
+
+**p \< 2.2 x 10\^(-16) = 0.00000000000000022 \<0.05**
+
+### Respecto a la interpretación de los dos resultados
+
+Las hipótesis de la prueba de Shapiro-Wilk son las siguientes:
+
+- Hipótesis nula (H₀): La muestra proviene de una distribución normal.
+
+- Hipótesis alternativa (H₁): La muestra no proviene de una distribución normal.
+
+Considerando un nivel de significancia de 0.05, los resultados obtenidos para las variables edad y leucocitos en LCR presentan valores p menores a dicho nivel.
+
+**Por lo tanto, se rechaza la hipótesis nula en ambas variables. Esto indica que ninguna de las dos presenta una distribución normal en nuestra muestra.**
+
+# 2. Para datos categóricos
+
+Esta parte la realizaremos utilizando la variable `meningitis_bacteriana_aguda`, que permite identificar si el paciente presenta o no meningitis bacteriana aguda.\
+\
+Nuestra base de datos contiene información sobre la presencia o ausencia de meningitis bacteriana aguda. Para realizar el análisis, se consideran únicamente los registros que presentan información válida en esta variable.
+
+De los 501 registros válidos, 217 pacientes presentan meningitis bacteriana aguda, mientras que 284 no presentan esta condición.
+
+Primero, debemos obtener las frecuencias observadas mediante la función `table()` de R.
+
+```{r}
+table(data_bac_aguda_limpia$meningitis_bacteriana_aguda)
+```
+
+Se observa que, de los 501 registros válidos, **284 corresponden a pacientes sin meningitis bacteriana aguda**, mientras que **217 corresponden a pacientes con presencia de esta enfermedad**. Esto representa una mayor frecuencia de casos ausentes en comparación con los presentes.\
+\
+Un estudio de vigilancia hospitalaria realizado en Jordania, Egipto e Irak durante el periodo 2024-2025, publicado en 2026, evaluó a **1881 pacientes con sospecha de meningitis bacteriana**. **De ellos, 123 (6.5 %) fueron confirmados** mediante pruebas PCR, **mientras que 1733 (92.1 %) obtuvieron resultados negativos.** Para comparar únicamente las dos categorías con resultados disponibles, se excluyeron los 25 pacientes que no fueron sometidos a la prueba. **De esta manera, se obtuvo una proporción de 93.37 % de resultados negativos y 6.63 %** de resultados positivos (Al-Kershi et al., 2026).
+
+doi: [10.1016/j.ijregi.2026.100984](https://doi.org/10.1016/j.ijregi.2026.100984)
+
+En este caso, el porcentaje reportado en el estudio científico representa la proporción esperada, mientras que la proporción obtenida de nuestra base de datos representa la proporción observada. Por ello, se busca comparar si existe una diferencia estadísticamente significativa entre ambas proporciones.
+
+Uno de los objetivos de nuestro análisis es evaluar si la proporción observada de meningitis bacteriana aguda difiere significativamente de la proporción esperada reportada en el artículo científico. Para ello, utilizaremos la prueba de bondad de ajuste de Chi-cuadrado.
+
+Las hipótesis de esta prueba son las siguientes:
+
+- **Hipótesis nula (H₀):** No existe una diferencia significativa entre la proporción observada de meningitis bacteriana aguda y la proporción esperada del estudio de referencia.
+
+<!-- -->
+
+- **Hipótesis alternativa (H₁):** Existe una diferencia significativa entre la proporción observada y la proporción esperada.
+
+En R, esta prueba se realiza mediante la función `chisq.test()`, a la cual se deben proporcionar los valores observados y las proporciones esperadas para llevar a cabo la comparación.\
+\
+Para realizar una comparación entre positivos y negativos, excluyendo los no evaluados: 6.63 % y 93.37 %.
+
+```{r}
+chisq.test(x = c(284, 217), p = c(0.9337, 0.0663))
+```
+
+Interpretación:
+
+El resultado de la prueba Chi-cuadrado de bondad de ajuste muestra un estadístico de 1089.1, con 1 grado de libertad y un valor de p menor a 0.05 (p \< 2.2 × 10⁻¹⁶).
+
+Por lo tanto, se rechaza la hipótesis nula (H₀) y se acepta que existe una diferencia estadísticamente significativa entre las proporciones observadas en nuestra base de datos y las proporciones esperadas del estudio de referencia.
+
+En nuestra base de datos, entre los 501 pacientes evaluados, el 56.69 % presentó ausencia de meningitis bacteriana aguda y el 43.31 % presentó la enfermedad. Estas proporciones difieren considerablemente de las esperadas (93.37 % y 6.63 %, respectivamente).
+
+**Esto indica que la distribución de los casos en nuestra base de datos no coincide con la reportada en el estudio de referencia.**\

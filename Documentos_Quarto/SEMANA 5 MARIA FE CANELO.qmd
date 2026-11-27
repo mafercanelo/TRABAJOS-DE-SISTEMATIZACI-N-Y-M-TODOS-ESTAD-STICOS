@@ -1,0 +1,275 @@
+---
+title: "Visualización de datos"
+author: "Kevin J Paez"
+format: html
+editor: visual
+---
+
+# Paquetes para visualizar datos
+
+```{r}
+#install.packages("gridExtra")
+```
+
+```{r}
+library(tidyverse)
+library(rio)
+library(here)
+library(gridExtra) ## Para múltiple gráficos en una sola página
+library(GGally) ## Para gráficos de correlación
+library(forcats)
+```
+
+# Cargando los datos
+
+La base de datos contiene información de 581 registros relacionados con meningitis bacteriana aguda. Incluye 24 variables que abarcan características demográficas, como edad, sexo y raza, así como datos clínicos y de laboratorio, entre ellos leucocitos, glucosa en sangre y líquido cefalorraquídeo (LCR), proteínas del LCR, tinción de Gram y resultados de cultivos.\
+
+```{r}
+data_bac_aguda_limpia_0 <- import(here("bac_aguda_limpia.csv"))
+```
+
+## Examinamos los datos
+
+`str()` es la función para ver la estructura de los datos.
+
+```{r}
+str(data_bac_aguda_limpia)
+```
+
+## Conversión de caracteres a factor (categóricos) usando la función `mutate_if()`
+
+Las variables categóricas (ej. Estadio T) han sido importadas como caracteres. Necesitamos transformalo a factores. En RStudio, factores es el tipo de dato para trabajar con variables categóricas.
+
+```{r}
+data_bac_aguda_limpia_0 <- data_bac_aguda_limpia_0 |> 
+  mutate_if(is.character, as.factor)
+str(data_bac_aguda_limpia)
+```
+
+Después de aplicar la función `mutate_if()`, las variables que estaban registradas como caracteres se convierten en factores, lo que permite trabajar con ellas como variables categóricas. En nuestra base de datos, esto incluye variables como el mes, la raza, el sexo y el conjunto de datos, entre otras. Las variables numéricas y enteras mantienen su tipo original, lo cual permite realizar análisis estadísticos según las características de cada variable.
+
+# Visualizando distribución de datos
+
+# 1. Visualizando datos categóricos
+
+Gráficos de barra Los gráficos de barra son adecuados para mostrar frecuencias de variables categóricas.
+
+```{r}
+data_bac_aguda_limpia |>  
+  ggplot(aes(x = sexo)) +
+  geom_bar()
+```
+
+El gráfico muestra la distribución de los pacientes según el sexo. Se observa que hay una mayor cantidad de pacientes de sexo femenino, seguido del sexo masculino. Además, aparece una categoría sin etiqueta que representa aproximadamente 80 registros, lo que podría corresponder a datos faltantes o valores vacíos en esta variable. Por ello, es importante revisar esos registros para interpretar correctamente la distribución de los pacientes con meningitis bacteriana aguda.
+
+Aquí, añadimos la función `fct_infreq()` de paquete forcats para ordenar (en orden decreciente) las barras del conteo, por estado marital.
+
+```{r}
+data_bac_aguda_limpia |>  
+  ggplot(aes(x = fct_infreq(raza))) +
+  geom_bar()
+```
+
+El gráfico muestra que la categoría Negro tiene la mayor frecuencia, con 286 registros, seguida de Blanco, con 210. Además, hay 85 registros sin información sobre la raza.
+
+\
+Con la función `labs()` podemos añadir nombres a los ejes del gráficos.
+
+```{r}
+data_bac_aguda_limpia |>
+  ggplot(aes(x = fct_infreq(raza))) +
+  geom_bar() +
+  labs(y = "Frecuencia", x = "Raza")
+```
+
+El gráfico de barras muestra la distribución de los registros según la variable raza. Se observa que la categoría Negro presenta la mayor frecuencia, con aproximadamente 286 registros, seguida de la categoría Blanco, con 210 registros. Asimismo, se observa una tercera categoría correspondiente a datos faltantes, con aproximadamente 85 registros. Esto indica que la categoría Negro es la más frecuente dentro de la base de datos analizada.
+
+- `y = "Frecuencia"`: es el eje vertical y muestra cuántos registros hay en cada categoría.
+
+- `x = "Raza"`: es el eje horizontal y muestra las categorías de raza, como Negro y Blanco.
+
+Para el gráfico de barra podemos usar frecuencias relativas. Por ejemplo, un gráfico de barras que muestre proporciones. Aquí es necesario calcular las proporciones. Nota que seguida a `y =` se muestra el cálculo para convertir los conteos a proporciones.
+
+```{r}
+data_bac_aguda_limpia |>
+  ggplot(aes(x = forcats::fct_infreq(raza))) +
+  geom_bar() +
+  labs(
+    title = "Distribución de pacientes según raza",
+    x = "Raza",
+    y = "Número de pacientes"
+  )
+```
+
+El gráfico permite comparar la frecuencia de las categorías de raza. Se identifica que Negro es la categoría predominante, con 286 pacientes registrados, frente a 210 de la categoría Blanco. Sin embargo, como existen 85 registros sin información sobre la raza, los resultados deben interpretarse teniendo en cuenta esta limitación.
+
+# 2. Visualizando Datos Numéricos
+
+## 2.1. Con histogramas
+
+Para visualizar conteos. Nota que aquí, la variable `glucosa_sangre` es numérica y la función para producir un histograma es `geom_histogram()`
+
+```{r}
+data_bac_aguda_limpia |>  
+  ggplot(aes(x = glucosa_sangre)) +
+  geom_histogram() +
+  labs(y = "Frecuencia", x = "glucosa_sangre")
+```
+
+De los 581 registros, solo 323 presentan valores registrados de glucosa en sangre. Los valores oscilan entre 1 y 410, con una media de aproximadamente 138,04 y una mediana de 125. La mayor concentración de observaciones se encuentra en los intervalos intermedios, especialmente entre aproximadamente 83 y 164. La distribución presenta una asimetría hacia la derecha debido a algunos valores elevados.
+
+```{r}
+data_bac_aguda_limpia  |>  
+  ggplot(aes(x = glucosa_sangre)) +
+  geom_histogram(aes(y = ..density..)) +
+  labs(y = "Density", x = "glucosa_sangre")
+```
+
+El histograma de densidad muestra que los valores de glucosa en sangre se concentran principalmente en los intervalos intermedios, mientras que hay menos observaciones en los valores más elevados. Se aprecia una distribución asimétrica hacia la derecha, debido a la presencia de valores altos que extienden la distribución. A diferencia del histograma de frecuencias, el eje vertical representa la densidad y no el número de pacientes.
+
+```{r}
+hist_1 = data_bac_aguda_limpia |> ggplot(aes(x = glucosa_sangre)) +
+  geom_histogram() +
+  labs(y = "Frecuencia", x = "glucosa_sangre")
+
+hist_2 = data_bac_aguda_limpia  |>  
+  ggplot(aes(x = glucosa_sangre)) +
+  geom_histogram(aes(y = ..density..)) +
+  labs(y = "Density", x = "glucosa_sangre")
+```
+
+```{r}
+grid.arrange(hist_1, hist_2, ncol = 2)
+```
+
+Ambos gráficos representan la distribución de la glucosa en sangre, pero utilizan escalas verticales diferentes. El primero muestra las frecuencias absolutas y el segundo representa la densidad. En ambos se observa que los valores se concentran principalmente en intervalos intermedios y que existe una cola hacia los valores elevados.
+
+```{r}
+data_bac_aguda_limpia |>  
+  ggplot(aes(x = glucosa_sangre)) +
+  geom_histogram(bins = 10) +
+  labs(y = "Frecuencia", x = "glucosa_sangre")
+```
+
+Al establecer 10 intervalos, se observa que el intervalo aproximado de 83 a 124 concentra la mayor cantidad de registros, con 142 observaciones. Le sigue el intervalo de aproximadamente 124 a 165, con 98 registros. En los intervalos superiores a 205, la frecuencia disminuye considerablemente, aunque se mantienen algunos valores elevados.
+
+```{r}
+data_bac_aguda_limpia |>  
+  ggplot(aes(x = glucosa_sangre)) +
+  geom_histogram(
+    color = "white", ## Color de las barras
+    fill = "cornflowerblue" ## Color de las barras
+    ) + 
+  labs(y = "Frecuencia", 
+       x = "glucosa_sangre")
+```
+
+El cambio de color permite distinguir visualmente las barras y facilita la lectura del histograma. Los valores de glucosa en sangre mantienen la misma distribución observada anteriormente, con mayor concentración en los intervalos intermedios y menor frecuencia en los valores más altos. La modificación del color no altera los resultados estadísticos.
+
+```{r}
+data_bac_aguda_limpia |>  
+  ggplot(aes(x = fct_infreq(raza), fill = raza)) +
+  geom_bar() +
+  labs(y = "Frecuencia", x = "raza")
+```
+
+El uso de colores permite diferenciar las categorías de raza. Se observa que Negro es la categoría más frecuente, con 286 registros, seguida de Blanco, con 210. La categoría sin información contiene 85 registros. El orden de las barras facilita reconocer cuáles son las categorías con mayor y menor frecuencia.
+
+## 2.2. Con Boxplots (gráfico de cajas y bigotes)
+
+Para mostrar datos de una variable en un gráfico de cajas y bigotes usamos la función `geom_boxplot()`
+
+```{r}
+data_bac_aguda_limpia |> 
+  ggplot(aes(y = glucosa_lcr)) + ## Cambia y por x para invertir el gráfico
+  geom_boxplot() +
+  theme(axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank()) +
+  labs(y = "Glucosa en LCR")
+```
+
+Los valores de glucosa en el líquido cefalorraquídeo (LCR) presentan una mediana de 61. El 50 % central de los registros se encuentra entre 34 y 77. Además, se identifican algunos valores elevados que aparecen como posibles valores atípicos. Esto indica que existe variabilidad en los valores de glucosa del LCR y que algunas observaciones se alejan del intervalo donde se concentra la mayor parte de los datos
+
+```{r}
+box_album_base = boxplot(data_bac_aguda_limpia$glucosa_lcr,
+                         ylab = "Glucosa en LCR",
+                         horizontal = TRUE, ## Cambia la dirección del gráfico
+                         col = "salmon") ## Añadimos color
+  
+```
+
+El diagrama obtenido con la función `boxplot()` representa la misma distribución de glucosa en LCR que el gráfico anterior. La mediana es de 61 y la caja comprende el intervalo entre 34 y 77. Los valores más alejados de la distribución aparecen como posibles valores atípicos. El cambio a una orientación horizontal y el uso del color salmón modifican únicamente la presentación visual.
+
+# 3. Visualizando variables categóricas *versus* categóricas
+
+```{r}
+data_bac_aguda_limpia |> 
+  ggplot(aes(x = raza, fill = sexo)) +
+  geom_bar(position = "dodge") + ## Sin este argumento, las barras estarán una sobre otras
+  labs(y = "Frecuencia",  
+       x = "raza",
+       fill = "Desenlace")
+```
+
+Al comparar la raza según el sexo, se observa que en la categoría Negro hay 153 registros femeninos y 133 masculinos. En la categoría Blanco se registran 124 mujeres y 86 hombres. También existen cuatro registros con raza no especificada y sexo registrado, además de 81 registros sin información sobre ambas variables. Estos resultados describen la distribución conjunta de las categorías, pero no permiten afirmar por sí solos que exista una asociación estadísticamente significativa.
+
+# 4. Visualización para variables continuas versus continuas
+
+Usamos la función geom_point para generar gráficos de dispersión y visualizar la relación de dos varaibles numéricas
+
+```{r}
+data_bac_aguda_limpia |> 
+  ggplot(aes(x = glucosa_lcr, y = glucosa_sangre)) +
+  geom_point() +
+  labs(x = "glucosa_lcr", y = "glucosa_sangre")
+```
+
+El gráfico permite explorar la relación entre la glucosa en LCR y la glucosa en sangre. Cada punto representa un registro con valores disponibles para ambas variables. La correlación calculada con los 308 registros que tienen ambas mediciones es aproximadamente 0,22, lo que indica una relación lineal positiva débil. Es decir, los valores tienden a aumentar conjuntamente, pero la relación no es intensa.
+
+\
+**Cada puntito es un cruce de un dato sobre la glucosa_lcr y la glucosa_sangre**
+
+La función geom_smoth añade una línea de regresión al gráfico. "lm" es para linear model
+
+```{r}
+data_bac_aguda_limpia |> 
+  ggplot(aes(x = glucosa_lcr, y = glucosa_sangre)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(x = "glucosa_lcr", y = "glucosa_sangre")
+```
+
+La línea de regresión permite observar la tendencia general entre ambas variables. La pendiente positiva concuerda con la correlación de aproximadamente 0,22, lo que sugiere que los valores más elevados de glucosa en LCR tienden a acompañarse de valores más altos de glucosa en sangre, aunque con bastante variabilidad.
+
+Aquí, función geom_smooth() añade una línea de tendencia suavizada al gráfico.
+
+```{r}
+data_bac_aguda_limpia |> 
+  ggplot(aes(x = glucosa_lcr, y = glucosa_sangre)) +
+  geom_point() +
+  geom_smooth(stat = "smooth", se = TRUE) +
+  labs(x = "glucosa_lcr", y = "glucosa_sangre")
+```
+
+La línea suavizada permite observar la tendencia general de los datos sin centrarse en cada punto individual. En esta base de datos, la relación entre ambas mediciones es positiva, pero débil. Por ello, los valores de glucosa en LCR no permiten predecir con precisión los valores de glucosa en sangre por sí solos.
+
+Finalmente, la función `ggpairs()` permite visualizar multiple variables numerica a la vez. Aquí, combinamos la funciónm select() (para seleccionar las variables numéricas) y ggpairs, para generar el gráfico y los coeficientes de correlación.
+
+```{r}
+data_bac_aguda_limpia |>  
+  select(glucosa_sangre, glucosa_lcr) %>% 
+  ggpairs(columnLabels = c("glucosa_sangre", "glucosa_lcr"))
+```
+
+La matriz permite examinar simultáneamente las distribuciones de glucosa en sangre y glucosa en LCR, además de su relación. La correlación aproximada de 0,22 indica una asociación lineal positiva débil entre ambas variables. Asimismo, las distribuciones muestran variabilidad en las mediciones, por lo que es importante considerar la dispersión de los datos al interpretar los resultados.
+
+# 6. Exportando figuras
+
+```{r}
+ggsave(
+  "nombre_de_objeto.png",
+  width = 7, # Ancho
+  height = 4, # Alto
+  dpi = 300 # resolución
+) 
+```
